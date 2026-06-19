@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FLEx FieldWorks Safe Interlinear Editor</title>
+<style>
+:root{
+  --bg:#f5f5f5;
+  --text:#222;
+  --muted:#555;
+  --panel:#fff;
+  --panel-2:#fafafa;
+  --button-bg:#eee;
+  --button-text:#222;
+  --button-border:#aaa;
+  --active:#0b6efd;
+  --active-text:#fff;
+  --border:#ddd;
+  --table-border:#ccc;
+  --th-bg:#f0f0f0;
+  --input-bg:transparent;
+  --input-text:#222;
+  --focus-bg:#eef6ff;
+  --focus-outline:#0b6efd;
+  --shadow:rgba(0,0,0,.12);
+  --missing-bg:#fff3cd;
+  --ok-bg:#e8f5e9;
+  --code-bg:#fff;
+  --code-text:#222;
+}
+body.dark-mode{
+  --bg:#1e1e1e;
+  --text:#e6e6e6;
+  --muted:#b8b8b8;
+  --panel:#2a2a2a;
+  --panel-2:#242424;
+  --button-bg:#3a3a3a;
+  --button-text:#eee;
+  --button-border:#666;
+  --active:#4d8dff;
+  --active-text:#fff;
+  --border:#555;
+  --table-border:#555;
+  --th-bg:#333;
+  --input-bg:#1f1f1f;
+  --input-text:#f0f0f0;
+  --focus-bg:#10243d;
+  --focus-outline:#6ea8ff;
+  --shadow:rgba(0,0,0,.45);
+  --missing-bg:#5f4b12;
+  --ok-bg:#1f4a2a;
+  --code-bg:#111;
+  --code-text:#d4d4d4;
+}
+
+body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);margin:0;padding:20px;max-width:1800px;font-size:var(--ui-font-size,16px)}
+h1{margin-bottom:4px}.toolbar,.tabs{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}
+button,label.file-button{padding:.5em .75em;border:1px solid var(--button-border);border-radius:4px;background:var(--button-bg);color:var(--button-text);cursor:pointer;font-size:1em}.tab-button.active{background:var(--active);color:var(--active-text);border-color:var(--active)}
+.tab{display:none}.tab.active{display:block}.sections{height:75vh;overflow-y:auto;display:flex;flex-direction:column;gap:18px;padding-right:8px}.card{background:var(--panel);color:var(--text);border-radius:8px;padding:15px;box-shadow:0 1px 6px var(--shadow)}.card h3{margin-top:0}.table-wrapper{overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:var(--panel);margin:10px 0}
+.lexicon-scroll{max-height:65vh;overflow:auto;border:1px solid var(--border);border-radius:6px;background:var(--panel);margin-top:10px}.lexicon-scroll table{min-width:1200px}.lexicon-scroll th{position:sticky;top:0;z-index:2}table{border-collapse:collapse;min-width:100%;width:auto}th,td{border:1px solid var(--table-border);padding:7px 9px;text-align:center;vertical-align:middle;white-space:nowrap}th{background:var(--th-bg)}.row-label{font-weight:700;background:var(--panel-2);text-align:right}input.word-input{min-width:120px;width:100%;box-sizing:border-box;border:none;background:var(--input-bg);color:var(--input-text);text-align:center;font-family:monospace;font-size:1em;padding:.25em}input.word-input:focus,textarea:focus{outline:2px solid var(--focus-outline);background:var(--focus-bg)}textarea{width:100%;box-sizing:border-box;min-height:70px;font-family:monospace;padding:8px;background:var(--code-bg);color:var(--code-text);border:1px solid var(--border)}
+.toolbar select{padding:6px;border-radius:4px;border:1px solid var(--button-border);background:var(--panel);color:var(--text)}.preview{background:var(--panel);color:var(--text);padding:15px;border-radius:8px;box-shadow:0 1px 6px var(--shadow);overflow-x:auto}.preview-section{margin-bottom:28px}.status{font-size:.95em;color:var(--muted)}.small{font-size:.85em;color:var(--muted)}.punct{color:#b00020;font-weight:700}.missing{background:var(--missing-bg)}.ok{background:var(--ok-bg)}.lexicon-summary{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}.badge{padding:6px 10px;border-radius:999px;background:var(--button-bg);border:1px solid var(--table-border)}
+</style>
+</head>
+<body>
+<h1>FLEx FieldWorks Safe Interlinear Editor</h1>
+<div class="status">Preserves the imported .flextext XML DOM and exports the same structure with only edited text/gloss/translation nodes changed. Edits commit after leaving a textbox.</div>
+<div class="toolbar">
+<label class="file-button">📂 Import .flextext<input type="file" hidden accept=".flextext,.xml" onchange="handleImport(event)"></label>
+<button onclick="exportFlextext()">Export FieldWorks-safe .flextext</button>
+<button onclick="newEmptyPhrase()">+ New Empty Phrase</button>
+<span style="display:inline-flex;gap:4px;align-items:center;">
+<span class="small">Text size:</span>
+<button type="button" onclick="changeUiTextSize(-1)">A−</button>
+<button type="button" onclick="resetUiTextSize()">Reset</button>
+<button type="button" onclick="changeUiTextSize(1)">A+</button>
+</span>
+<button type="button" id="darkModeToggle" onclick="toggleDarkMode()">🌙 Dark Mode</button>
+</div>
+<div class="tabs">
+<button id="editBtn" class="tab-button active" onclick="showTab('edit')">Edit</button>
+<button id="previewBtn" class="tab-button" onclick="showTab('preview')">Preview</button>
+<button id="lexiconBtn" class="tab-button" onclick="showTab('lexicon')">Lexicon</button>
+<button id="expexBtn" class="tab-button" onclick="showTab('expex')">LaTeX ExPex Export</button>
+</div>
+<div id="edit" class="tab active"><div id="sections" class="sections"><div class="card">Import a .flextext file to begin.</div></div></div>
+<div id="preview" class="tab"><div id="previewContent" class="preview">Import a .flextext file to preview.</div></div>
+<div id="lexicon" class="tab"><div class="preview"><h2>Lexicon</h2><div class="toolbar"><input id="lexiconSearch" class="word-input" style="max-width:320px;border:1px solid #bbb;text-align:left" placeholder="Search lexicon..." onchange="updateLexicon()"><button onclick="downloadLexiconCsv()">Export Lexicon CSV</button>
+<button onclick="downloadLexiconSfm()">Export Lexicon SFM</button></div><div id="lexiconContent">Import a .flextext file to build a lexicon.</div></div></div>
+<div id="expex" class="tab">
+<div class="preview">
+<h2>LaTeX ExPex Export</h2>
+<p class="small">Assign ExPex line tags to each text layer. Leave a part blank to omit it from the export.</p>
+
+<div class="toolbar">
+<label>Token text:
+<select id="expexTokenTag" onchange="updateExpexPreview()">
+<option value="gla" selected>gla</option><option value="glb">glb</option><option value="glc">glc</option><option value="glft">glft</option><option value="">omit</option>
+</select>
+</label>
+
+<label>Morpheme text:
+<select id="expexMorphTag" onchange="updateExpexPreview()">
+<option value="gla">gla</option><option value="glb" selected>glb</option><option value="glc">glc</option><option value="glft">glft</option><option value="">omit</option>
+</select>
+</label>
+
+<label>English gloss:
+<select id="expexGlossTag" onchange="updateExpexPreview()">
+<option value="gla">gla</option><option value="glb">glb</option><option value="glc" selected>glc</option><option value="glft">glft</option><option value="">omit</option>
+</select>
+</label>
+
+<label>Phrase-level gloss:
+<select id="expexPhraseGlossTag" onchange="updateExpexPreview()">
+<option value="gla">gla</option><option value="glb">glb</option><option value="glc">glc</option><option value="glft" selected>glft</option><option value="">omit</option>
+</select>
+</label>
+</div>
+
+<div class="toolbar">
+<button onclick="copyExpexLatex()">Copy LaTeX</button>
+<button onclick="saveExpexLatex()">Save As .tex</button>
+</div>
+
+<textarea id="expexOutput" style="min-height:420px;font-family:monospace;white-space:pre;" readonly></textarea>
+</div>
+</div>
+
+<script>
+let xmlDoc=null;let phrases=[];let importedBaseName='interlinear_text';
+function showTab(id){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ document.getElementById('editBtn').classList.toggle('active',id==='edit');
+ document.getElementById('previewBtn').classList.toggle('active',id==='preview');
+ const lexBtn=document.getElementById('lexiconBtn');
+ if(lexBtn) lexBtn.classList.toggle('active',id==='lexicon');
+ const expexBtn=document.getElementById('expexBtn');
+ if(expexBtn) expexBtn.classList.toggle('active',id==='expex');
+ if(id==='lexicon') updateLexicon();
+ if(id==='expex') updateExpexPreview();
+}
+
+function escapeHtml(s){return String(s??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function jsString(s){return String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\n/g,'\\n').replace(/\r/g,'\\r');}
+function directChildrenByTag(node,tag){return [...node.children].filter(ch=>ch.tagName===tag);}function directItems(node,type){return directChildrenByTag(node,'item').filter(i=>i.getAttribute('type')===type);}function firstDirectItem(node,type,langPreferred){const items=directItems(node,type);if(langPreferred){const exact=items.find(i=>(i.getAttribute('lang')||'')===langPreferred);if(exact)return exact;}return items[0]||null;}
+function handleImport(e){const f=e.target.files[0];if(!f)return;importedBaseName=(f.name||'interlinear_text').replace(/\.[^.]+$/,'')||'interlinear_text';const r=new FileReader();r.onload=x=>parseFlextext(x.target.result);r.readAsText(f);}
+function parseFlextext(xml){xmlDoc=new DOMParser().parseFromString(xml,'text/xml');if(xmlDoc.getElementsByTagName('parsererror')[0]){alert('Could not parse XML.');return;}phrases=[];[...xmlDoc.getElementsByTagName('phrase')].forEach((phraseNode,pi)=>{const phrase={node:phraseNode,segnumNode:firstDirectItem(phraseNode,'segnum'),translationNode:null,words:[]};const phraseGlsItems=directItems(phraseNode,'gls');phrase.translationNode=phraseGlsItems.find(i=>(i.getAttribute('lang')||'')==='en')||phraseGlsItems[0]||null;[...phraseNode.getElementsByTagName('word')].forEach(wordNode=>{const txtNode=firstDirectItem(wordNode,'txt');const punctNode=firstDirectItem(wordNode,'punct');const wordGlsItems=directItems(wordNode,'gls');const wordGlossNode=wordGlsItems.find(i=>(i.getAttribute('lang')||'')==='en')||wordGlsItems[0]||null;const morphs=[];[...wordNode.getElementsByTagName('morph')].forEach(morphNode=>{const morphTxtNode=firstDirectItem(morphNode,'txt');const morphGlsItems=directItems(morphNode,'gls');const morphGlossNode=morphGlsItems.find(i=>(i.getAttribute('lang')||'')==='en')||morphGlsItems[0]||null;morphs.push({node:morphNode,txtNode:morphTxtNode,glossNode:morphGlossNode});});phrase.words.push({node:wordNode,txtNode,punctNode,wordGlossNode,morphs});});phrases.push(phrase);});renderAll();}
+function segnumText(p,idx){return p.segnumNode?p.segnumNode.textContent.trim():String(idx+1);}function wordText(w){if(w.txtNode)return w.txtNode.textContent;if(w.punctNode)return w.punctNode.textContent;return '';}function wordGlossText(w){if(w.wordGlossNode)return w.wordGlossNode.textContent;return w.morphs.map(m=>m.glossNode?m.glossNode.textContent:'').filter(Boolean).join(' ');}function morphTextValue(w){return w.morphs.map(m=>m.txtNode?m.txtNode.textContent:'').filter(Boolean).join('-');}
+function ensureWordGlossNode(word){if(word.wordGlossNode)return word.wordGlossNode;const node=xmlDoc.createElement('item');node.setAttribute('type','gls');node.setAttribute('lang','en');node.textContent='';word.node.appendChild(node);word.wordGlossNode=node;return node;}
+function ensureMorphemeStructure(word){if(word.morphs.length)return;const morphemes=xmlDoc.createElement('morphemes');const morph=xmlDoc.createElement('morph');const morphTxt=xmlDoc.createElement('item');morphTxt.setAttribute('type','txt');morphTxt.textContent=wordText(word);const morphGloss=xmlDoc.createElement('item');morphGloss.setAttribute('type','gls');morphGloss.setAttribute('lang','en');morphGloss.textContent='';morph.appendChild(morphTxt);morph.appendChild(morphGloss);morphemes.appendChild(morph);word.node.appendChild(morphemes);word.morphs.push({node:morph,txtNode:morphTxt,glossNode:morphGloss});}
+function setWordMorphText(word,value){ensureMorphemeStructure(word);const parts=String(value||'').split('-');word.morphs.forEach((m,i)=>{if(m.txtNode)m.txtNode.textContent=parts[i]??'';});for(let i=word.morphs.length;i<parts.length;i++){let morphemes=word.node.getElementsByTagName('morphemes')[0];if(!morphemes){morphemes=xmlDoc.createElement('morphemes');word.node.appendChild(morphemes);}const morph=xmlDoc.createElement('morph');const morphTxt=xmlDoc.createElement('item');morphTxt.setAttribute('type','txt');morphTxt.textContent=parts[i];const morphGloss=xmlDoc.createElement('item');morphGloss.setAttribute('type','gls');morphGloss.setAttribute('lang','en');morphGloss.textContent='';morph.appendChild(morphTxt);morph.appendChild(morphGloss);morphemes.appendChild(morph);word.morphs.push({node:morph,txtNode:morphTxt,glossNode:morphGloss});}}
+function setWordGlossText(word,value){const node=ensureWordGlossNode(word);node.textContent=value;}
+
+function sectionWordGlossText(phrase){
+ return phrase.words
+   .map(w=>wordGlossText(w).trim())
+   .filter(Boolean)
+   .join(' ');
+}
+
+function copyWordGlossToTranslation(pi){
+ const phrase=phrases[pi];
+ if(!phrase) return;
+
+ const gloss=sectionWordGlossText(phrase);
+
+ if(!phrase.translationNode){
+   phrase.translationNode=xmlDoc.createElement('item');
+   phrase.translationNode.setAttribute('type','gls');
+   phrase.translationNode.setAttribute('lang','en');
+   phrase.node.appendChild(phrase.translationNode);
+ }
+
+ phrase.translationNode.textContent=gloss;
+ renderAll();
+ updatePreview();
+ if(document.getElementById('lexicon')?.classList.contains('active')) updateLexicon();
+ if(document.getElementById('expex')?.classList.contains('active')) updateExpexPreview();
+}
+
+function safeFilenamePart(value){
+ return String(value || 'interlinear_text')
+   .replace(/\.[^.]+$/,'')
+   .replace(/[^\p{L}\p{N}_-]+/gu,'_')
+   .replace(/^_+|_+$/g,'')
+   .slice(0,80) || 'interlinear_text';
+}
+
+function timestampForFilename(){
+ const d=new Date();
+ const pad=n=>String(n).padStart(2,'0');
+ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+}
+
+function exportedFlextextFilename(){
+ return `${safeFilenamePart(importedBaseName)}_${timestampForFilename()}.flextext`;
+}
+
+function renderAll(){const root=document.getElementById('sections');if(!phrases.length){root.innerHTML='<div class="card">No phrases found.</div>';updatePreview();return;}root.innerHTML='';phrases.forEach((p,pi)=>{const card=document.createElement('div');card.className='card';let html=`<h3>Section ${escapeHtml(segnumText(p,pi))}</h3><div class="small">Words: ${p.words.length}</div><div class="table-wrapper"><table><thead><tr><th></th>`;p.words.forEach((w,wi)=>{const label=w.punctNode&&!w.txtNode?'Punct':'Word '+(wi+1);html+=`<th>${escapeHtml(label)}</th>`;});html+='</tr></thead><tbody>';html+='<tr><td class="row-label">Token text</td>';p.words.forEach((w,wi)=>{html+=`<td><input class="word-input ${w.punctNode?'punct':''}" value="${escapeHtml(wordText(w))}" onchange="updateWordText(${pi},${wi},this.value)"></td>`;});html+='</tr><tr><td class="row-label">Morpheme text</td>';p.words.forEach((w,wi)=>{html+=`<td><input class="word-input" value="${escapeHtml(morphTextValue(w))}" onchange="updateMorphText(${pi},${wi},this.value)"></td>`;});html+='</tr><tr><td class="row-label">English gloss</td>';p.words.forEach((w,wi)=>{html+=`<td><input class="word-input" value="${escapeHtml(wordGlossText(w))}" onchange="updateGloss(${pi},${wi},this.value)"></td>`;});html+='</tr></tbody></table></div>';html+=`<div style="margin:10px 0;"><button type="button" onclick="copyWordGlossToTranslation(${pi})">Copy Word Gloss</button></div>`;const translation=p.translationNode?p.translationNode.textContent:'';html+=`<label><strong>Free Translation (phrase-level gls)</strong></label><textarea onchange="updateTranslation(${pi},this.value)" ${p.translationNode?'':'disabled'}>${escapeHtml(translation)}</textarea>`;if(!p.translationNode)html+='<div class="small">No direct phrase-level gls item found; field disabled to avoid adding new structure.</div>';card.innerHTML=html;root.appendChild(card);});updatePreview();}
+function updateWordText(pi,wi,val){const w=phrases[pi].words[wi];if(w.txtNode)w.txtNode.textContent=val;else if(w.punctNode)w.punctNode.textContent=val;updatePreview();if(document.getElementById('lexicon')?.classList.contains('active'))updateLexicon();}
+function updateMorphText(pi,wi,val){setWordMorphText(phrases[pi].words[wi],val);updatePreview();if(document.getElementById('lexicon')?.classList.contains('active'))updateLexicon();}
+function updateGloss(pi,wi,val){const w=phrases[pi].words[wi];setWordGlossText(w,val);offerGlobalGlossUpdate(pi,wi,val);updatePreview();if(document.getElementById('lexicon')?.classList.contains('active'))updateLexicon();}
+function offerGlobalGlossUpdate(pi,wi,newValue){const txt=wordText(phrases[pi].words[wi]).trim().toLowerCase();if(!txt)return;const matches=[];phrases.forEach((p,p2)=>p.words.forEach((w,w2)=>{if(p2===pi&&w2===wi)return;if(wordText(w).trim().toLowerCase()===txt)matches.push([p2,w2]);}));if(matches.length&&confirm(`Update ${matches.length} other occurrence(s) of "${wordText(phrases[pi].words[wi])}" with this English gloss?`)){matches.forEach(([p2,w2])=>setWordGlossText(phrases[p2].words[w2],newValue));renderAll();}}
+function updateTranslation(pi,val){const node=phrases[pi].translationNode;if(node)node.textContent=val;updatePreview();}
+
+let lemmaOverrides = {};
+
+function lemmaKeyForSurface(form,morph,gloss){
+ return normalizedLexiconKey(form) + '||' + String(morph || '').trim().toLowerCase() + '||' + String(gloss || '').trim().toLowerCase();
+}
+
+function guessLemmaFromMorphOrForm(form,morph){
+ const m=String(morph || '').trim();
+ if(m){
+   const first=m.split(/[+\-]/)[0].trim();
+   if(first) return first;
+ }
+ return String(form || '').trim();
+}
+
+function getLemmaForEntry(entry){
+ const morph=entry.morph ?? (typeof lexiconDefaultMorph === 'function' ? lexiconDefaultMorph(entry) : '');
+ const gloss=entry.gloss ?? (typeof lexiconDefaultGloss === 'function' ? lexiconDefaultGloss(entry) : '');
+ const key=lemmaKeyForSurface(entry.form,morph,gloss);
+ return lemmaOverrides[key] || guessLemmaFromMorphOrForm(entry.form,morph);
+}
+
+function updateLemmaForEntry(form,morph,gloss,value){
+ const key=lemmaKeyForSurface(form,morph,gloss);
+ lemmaOverrides[key]=String(value || '').trim();
+ updateLexicon();
+}
+
+function normalizedLexiconKey(text){return String(text||'').trim().toLowerCase().replace(/^[\s.,;:!?='"“”‘’()[\]{}<>«»]+|[\s.,;:!?='"“”‘’()[\]{}<>«»]+$/g,'');}
+function normalizedAnalysisKey(text){return String(text||'').trim().toLowerCase();}function hasMorphBreakdown(word){return morphTextValue(word).trim().length>0;}function hasEnglishGloss(word){return wordGlossText(word).trim().length>0;}
+function buildLexicon(){const analysisEntries=new Map();const formEntries=new Map();let tokenCount=0,missingMorphTokens=0,missingGlossTokens=0;phrases.forEach((phrase,phraseIndex)=>{phrase.words.forEach((word,wordIndex)=>{const form=wordText(word).trim();const formKey=normalizedLexiconKey(form);if(!formKey)return;if(word.punctNode&&!word.txtNode)return;const morph=morphTextValue(word).trim();const gloss=wordGlossText(word).trim();const morphKey=normalizedAnalysisKey(morph);const glossKey=normalizedAnalysisKey(gloss);const analysisKey=`${formKey}||${morphKey}||${glossKey}`;const section=segnumText(phrase,phraseIndex);tokenCount++;if(!morph)missingMorphTokens++;if(!gloss)missingGlossTokens++;if(!formEntries.has(formKey))formEntries.set(formKey,{key:formKey,form,count:0,analyses:new Set(),missingMorphCount:0,missingGlossCount:0});const f=formEntries.get(formKey);f.count++;f.analyses.add(analysisKey);if(!morph)f.missingMorphCount++;if(!gloss)f.missingGlossCount++;if(!analysisEntries.has(analysisKey))analysisEntries.set(analysisKey,{key:analysisKey,formKey,form,morph,gloss,count:0,sections:new Set(),examples:[],refs:[],missingMorphCount:0,missingGlossCount:0});const e=analysisEntries.get(analysisKey);e.count++;e.refs.push({phraseIndex,wordIndex,word});if(section)e.sections.add(section);if(!morph)e.missingMorphCount++;if(!gloss)e.missingGlossCount++;if(e.examples.length<5)e.examples.push({section,wordIndex:wordIndex+1});});});const analyses=[...analysisEntries.values()].sort((a,b)=>a.form.localeCompare(b.form,undefined,{sensitivity:'base'})||a.morph.localeCompare(b.morph,undefined,{sensitivity:'base'})||a.gloss.localeCompare(b.gloss,undefined,{sensitivity:'base'}));const forms=[...formEntries.values()];analyses.stats={uniqueFormCount:forms.length,uniqueAnalysisCount:analyses.length,tokenCount,missingMorphTokens,missingGlossTokens,formsWithMultipleAnalyses:forms.filter(f=>f.analyses.size>1).length,formsMissingMorph:forms.filter(f=>f.missingMorphCount>0).length,formsMissingGloss:forms.filter(f=>f.missingGlossCount>0).length};return analyses;}
+function updateLexiconMorph(key,value){const entry=buildLexicon().find(e=>e.key===key);if(!entry)return;entry.refs.forEach(ref=>setWordMorphText(ref.word,value));renderAll();updatePreview();updateLexicon();}
+function updateLexiconGloss(key,value){const entry=buildLexicon().find(e=>e.key===key);if(!entry)return;entry.refs.forEach(ref=>setWordGlossText(ref.word,value));renderAll();updatePreview();updateLexicon();}
+function updateLexicon(){
+ const target=document.getElementById('lexiconContent');
+ if(!target) return;
+
+ if(!phrases.length){
+   target.innerHTML='Import a .flextext file to build a lexicon.';
+   return;
+ }
+
+ const searchEl=document.getElementById('lexiconSearch');
+ const query=(searchEl ? searchEl.value : '').trim().toLowerCase();
+ let entries=buildLexicon();
+ const stats=entries.stats || {
+   uniqueFormCount:entries.length,
+   uniqueAnalysisCount:entries.length,
+   tokenCount:entries.reduce((n,e)=>n+(Number(e.count)||0),0),
+   missingMorphTokens:entries.reduce((n,e)=>n+(Number(e.missingMorphCount)||0),0),
+   missingGlossTokens:entries.reduce((n,e)=>n+(Number(e.missingGlossCount)||0),0)
+ };
+
+ if(query){
+   entries=entries.filter(e=>{
+     const morph=e.morph ?? (typeof lexiconDefaultMorph === 'function' ? lexiconDefaultMorph(e) : '');
+     const gloss=e.gloss ?? (typeof lexiconDefaultGloss === 'function' ? lexiconDefaultGloss(e) : '');
+     const lemma=getLemmaForEntry({...e,morph,gloss});
+     return e.form.toLowerCase().includes(query) ||
+       morph.toLowerCase().includes(query) ||
+       gloss.toLowerCase().includes(query) ||
+       lemma.toLowerCase().includes(query);
+   });
+ }
+
+ let out=`<div class="lexicon-summary">
+   <span class="badge"><strong>${stats.uniqueFormCount ?? entries.length}</strong> unique word forms</span>
+   <span class="badge"><strong>${stats.uniqueAnalysisCount ?? entries.length}</strong> unique analyses</span>
+   <span class="badge"><strong>${stats.tokenCount ?? ''}</strong> word tokens</span>
+   <span class="badge"><strong>${stats.missingMorphTokens ?? ''}</strong> tokens missing morphology</span>
+   <span class="badge"><strong>${stats.missingGlossTokens ?? ''}</strong> tokens missing English gloss</span>
+ </div>`;
+
+ out+=`<div class="small">${entries.length} analysis row(s) shown. Enter the same lemma for forms that should be grouped together in the lemma-based SFM export. The table scrolls vertically and horizontally.</div>`;
+ out+=`<div class="lexicon-scroll"><table>
+ <thead><tr>
+   <th>Lemma / Lexeme</th>
+   <th>Surface Form</th>
+   <th>Token Count</th>
+   <th>Missing Morph</th>
+   <th>Missing Gloss</th>
+   <th>Editable Morphological Breakdown</th>
+   <th>Editable English Gloss</th>
+   <th>Sections</th>
+   <th>Examples</th>
+ </tr></thead><tbody>`;
+
+ entries.forEach(e=>{
+   const morph=e.morph ?? (typeof lexiconDefaultMorph === 'function' ? lexiconDefaultMorph(e) : '');
+   const gloss=e.gloss ?? (typeof lexiconDefaultGloss === 'function' ? lexiconDefaultGloss(e) : '');
+   const lemma=getLemmaForEntry({...e,morph,gloss});
+   const sections=e.sections ? [...e.sections].join(', ') : '';
+   const examples=e.examples ? e.examples.map(ex=>`${ex.section}:W${ex.wordIndex}`).join(', ') : '';
+
+   out+=`<tr>
+     <td><input class="word-input" value="${escapeHtml(lemma)}" onchange="updateLemmaForEntry('${jsString(e.form)}','${jsString(morph)}','${jsString(gloss)}',this.value)"></td>
+     <td><strong>${escapeHtml(e.form)}</strong></td>
+     <td>${e.count}</td>
+     <td class="${e.missingMorphCount>0?'missing':'ok'}">${e.missingMorphCount}</td>
+     <td class="${e.missingGlossCount>0?'missing':'ok'}">${e.missingGlossCount}</td>
+     <td><input class="word-input" value="${escapeHtml(morph)}" onchange="updateLexiconMorph('${jsString(e.key)}',this.value)"></td>
+     <td><input class="word-input" value="${escapeHtml(gloss)}" onchange="updateLexiconGloss('${jsString(e.key)}',this.value)"></td>
+     <td>${escapeHtml(sections)}</td>
+     <td>${escapeHtml(examples)}</td>
+   </tr>`;
+ });
+
+ out+=`</tbody></table></div>`;
+ target.innerHTML=out;
+}
+
+function downloadLexiconCsv(){const entries=buildLexicon();if(!entries.length){alert('No lexicon entries to export.');return;}const rows=[['Word Form','Token Count','Missing Morph Token Count','Missing English Gloss Token Count','Morphological Breakdown','English Gloss','Sections','Examples']];entries.forEach(e=>rows.push([e.form,String(e.count),String(e.missingMorphCount),String(e.missingGlossCount),e.morph,e.gloss,[...e.sections].join(', '),e.examples.map(ex=>`${ex.section}:W${ex.wordIndex}`).join(', ')]));const csv=rows.map(row=>row.map(cell=>{const v=String(cell??'');return /[",\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;}).join(',')).join('\n');const blob=new Blob([csv],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='flextext_lexicon.csv';a.click();URL.revokeObjectURL(url);}
+function updatePreview(){const el=document.getElementById('previewContent');if(!phrases.length){el.innerHTML='Import a .flextext file to preview.';return;}let html='';phrases.forEach((p,pi)=>{html+=`<div class="preview-section"><h3>Section ${escapeHtml(segnumText(p,pi))}</h3><div><strong>Free Translation:</strong> ${escapeHtml(p.translationNode?p.translationNode.textContent:'')}</div><div class="table-wrapper"><table><tr><th></th>${p.words.map((_,i)=>`<th>W${i+1}</th>`).join('')}</tr><tr><td class="row-label">Token</td>${p.words.map(w=>`<td>${escapeHtml(wordText(w))}</td>`).join('')}</tr><tr><td class="row-label">Morph</td>${p.words.map(w=>`<td>${escapeHtml(morphTextValue(w))}</td>`).join('')}</tr><tr><td class="row-label">Gloss</td>${p.words.map(w=>`<td>${escapeHtml(wordGlossText(w))}</td>`).join('')}</tr></table></div></div>`;});el.innerHTML=html;if(document.getElementById('lexicon')?.classList.contains('active'))updateLexicon();}
+function newEmptyPhrase(){if(!xmlDoc)xmlDoc=new DOMParser().parseFromString('<document></document>','text/xml');const root=xmlDoc.documentElement;const phrase=xmlDoc.createElement('phrase');const seg=xmlDoc.createElement('item');seg.setAttribute('type','segnum');seg.textContent=String(phrases.length+1);phrase.appendChild(seg);const words=xmlDoc.createElement('words');const word=xmlDoc.createElement('word');const txt=xmlDoc.createElement('item');txt.setAttribute('type','txt');txt.textContent='';word.appendChild(txt);const gls=xmlDoc.createElement('item');gls.setAttribute('type','gls');gls.setAttribute('lang','en');gls.textContent='';word.appendChild(gls);words.appendChild(word);phrase.appendChild(words);const phraseGls=xmlDoc.createElement('item');phraseGls.setAttribute('type','gls');phraseGls.setAttribute('lang','en');phraseGls.textContent='';phrase.appendChild(phraseGls);root.appendChild(phrase);parseFlextext(new XMLSerializer().serializeToString(xmlDoc));}
+
+
+
+function latexEscape(s){
+ return String(s ?? '')
+   .replace(/\\/g,'\\textbackslash{}')
+   .replace(/([{}_$&#%])/g,'\\$1')
+   .replace(/\^/g,'\\textasciicircum{}')
+   .replace(/~/g,'\\textasciitilde{}');
+}
+
+function isPunctuationOnly(text){
+ return /^[\s.,;:!?'"“”‘’()[\]{}<>«»—–-]+$/.test(String(text ?? ''));
+}
+
+function isOpeningPunctuation(text){
+ return /^[\s"'“‘([{«]+$/.test(String(text ?? ''));
+}
+
+function isClosingPunctuation(text){
+ return /^[\s.,;:!?'"”’)\]}»]+$/.test(String(text ?? ''));
+}
+
+function attachPunctuationTokens(tokens){
+ const out=[];
+
+ tokens.forEach(raw=>{
+   const token=String(raw ?? '').trim();
+   if(!token) return;
+
+   if(isPunctuationOnly(token)){
+     if(isOpeningPunctuation(token) && !isClosingPunctuation(token)){
+       out.push(token);
+     }else if(out.length){
+       out[out.length-1]+=token;
+     }else{
+       out.push(token);
+     }
+   }else{
+     if(out.length && isOpeningPunctuation(out[out.length-1])){
+       out[out.length-1]+=token;
+     }else{
+       out.push(token);
+     }
+   }
+ });
+
+ return out;
+}
+
+function expexPlainToken(text){
+ return latexEscape(String(text ?? '').trim());
+}
+
+function needsExpexGlossBraces(text){
+ const t=String(text ?? '').trim();
+ if(!t) return false;
+ if(t.startsWith('{') && t.endsWith('}')) return false;
+ return /\s/.test(t);
+}
+
+function expexGlossToken(text){
+ const raw=String(text ?? '').trim();
+ if(!raw) return '';
+ const escaped=latexEscape(raw);
+ return needsExpexGlossBraces(raw) ? `{${escaped}}` : escaped;
+}
+
+function expexTokenLine(phrase){
+ const rawTokens=phrase.words.map(w=>wordText(w).trim()).filter(Boolean);
+ return attachPunctuationTokens(rawTokens).map(expexPlainToken).join(' ');
+}
+
+function expexMorphLine(phrase){
+ const rawTokens=phrase.words.map(w=>{
+   const surface=wordText(w).trim();
+   if(isPunctuationOnly(surface)) return surface;
+   const morph=morphTextValue(w).trim();
+   return morph || surface;
+ }).filter(Boolean);
+
+ return attachPunctuationTokens(rawTokens).map(expexPlainToken).join(' ');
+}
+
+function expexGlossLine(phrase){
+ const rawTokens=phrase.words.map(w=>{
+   const surface=wordText(w).trim();
+
+   // Punctuation should not create separate gloss alignment tokens.
+   // Attach punctuation to the previous gloss token, matching the token/morph lines.
+   if(isPunctuationOnly(surface)) return surface;
+
+   return wordGlossText(w).trim();
+ }).filter(Boolean);
+
+ return attachPunctuationTokens(rawTokens).map(token=>{
+   if(isPunctuationOnly(token)) return latexEscape(token);
+   return expexGlossToken(token);
+ }).join(' ');
+}
+
+function expexPhraseGlossLine(phrase){
+ return phrase.translationNode ? phrase.translationNode.textContent.trim() : '';
+}
+
+function getExpexAssignments(){
+ return {
+   token:document.getElementById('expexTokenTag')?.value ?? 'gla',
+   morph:document.getElementById('expexMorphTag')?.value ?? 'glb',
+   gloss:document.getElementById('expexGlossTag')?.value ?? 'glc',
+   phraseGloss:document.getElementById('expexPhraseGlossTag')?.value ?? 'glft'
+ };
+}
+
+function expexTaggedLine(tag,content){
+ if(!tag || !String(content || '').trim()) return '';
+ return `\\${tag} ${content.trim()}//\n`;
+}
+
+function buildExpexLatex(){
+ if(!phrases.length) return '% Import a .flextext file first.\n';
+
+ const tags=getExpexAssignments();
+ let out='% Generated from FLEx .flextext by FieldWorks Safe Interlinear Editor\n';
+ out+='% Requires: \\usepackage{expex}\n\n';
+
+ phrases.forEach((phrase,idx)=>{
+   const tokenLine=expexTokenLine(phrase);
+   const morphLine=expexMorphLine(phrase);
+   const glossLine=expexGlossLine(phrase);
+   const phraseGlossLine=latexEscape(expexPhraseGlossLine(phrase));
+
+   const sectionNumber=latexEscape(segnumText(phrase,idx));
+   out+=`% flextext section ${sectionNumber}\n`;
+   out+='\\ex\n';
+   out+='\\begingl\n';
+   out+=expexTaggedLine(tags.token,tokenLine);
+   out+=expexTaggedLine(tags.morph,morphLine);
+   out+=expexTaggedLine(tags.gloss,glossLine);
+   out+=expexTaggedLine(tags.phraseGloss,phraseGlossLine);
+   out+='\\endgl\n';
+   out+='\\xe\n\n';
+ });
+
+ return out;
+}
+
+function updateExpexPreview(){
+ const box=document.getElementById('expexOutput');
+ if(box) box.value=buildExpexLatex();
+}
+
+async function copyExpexLatex(){
+ const text=buildExpexLatex();
+ try{
+   await navigator.clipboard.writeText(text);
+   alert('LaTeX ExPex output copied to clipboard.');
+ }catch(e){
+   const box=document.getElementById('expexOutput');
+   if(box){
+     box.focus();
+     box.select();
+   }
+   alert('Clipboard access was unavailable. The LaTeX text is selected so you can copy it manually.');
+ }
+}
+
+async function saveExpexLatex(){
+ const text=buildExpexLatex();
+
+ if(window.showSaveFilePicker){
+   try{
+     const handle=await window.showSaveFilePicker({
+       suggestedName:'interlinear_expex.tex',
+       types:[{
+         description:'LaTeX file',
+         accept:{'text/x-tex':['.tex'],'text/plain':['.tex','.txt']}
+       }]
+     });
+     const writable=await handle.createWritable();
+     await writable.write(text);
+     await writable.close();
+     return;
+   }catch(e){
+     if(e && e.name==='AbortError') return;
+   }
+ }
+
+ const blob=new Blob([text],{type:'text/x-tex'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ a.href=url;
+ a.download='interlinear_expex.tex';
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+
+
+
+let darkModeEnabled = localStorage.getItem('flexEditorDarkMode') === 'true';
+
+function applyDarkMode(){
+ document.body.classList.toggle('dark-mode', darkModeEnabled);
+ localStorage.setItem('flexEditorDarkMode', String(darkModeEnabled));
+ const btn=document.getElementById('darkModeToggle');
+ if(btn) btn.textContent = darkModeEnabled ? '☀️ Light Mode' : '🌙 Dark Mode';
+}
+
+function toggleDarkMode(){
+ darkModeEnabled = !darkModeEnabled;
+ applyDarkMode();
+}
+
+
+let uiTextSize = Number(localStorage.getItem('flexEditorUiTextSize') || 16);
+
+function applyUiTextSize(){
+ document.documentElement.style.setProperty('--ui-font-size', uiTextSize + 'px');
+ localStorage.setItem('flexEditorUiTextSize', String(uiTextSize));
+}
+
+function changeUiTextSize(delta){
+ uiTextSize = Math.max(11, Math.min(28, uiTextSize + delta));
+ applyUiTextSize();
+}
+
+function resetUiTextSize(){
+ uiTextSize = 16;
+ applyUiTextSize();
+}
+
+applyUiTextSize();
+
+
+
+function sfmEscape(value){
+ return String(value ?? '')
+   .replace(/\r?\n/g,' ')
+   .replace(/\s+/g,' ')
+   .trim();
+}
+
+function buildLexiconSfm(){
+ const entries=buildLexicon();
+ if(!entries.length) return '';
+
+ const groups=new Map();
+
+ entries.forEach(entry=>{
+   const morph=entry.morph ?? (typeof lexiconDefaultMorph === 'function' ? lexiconDefaultMorph(entry) : '');
+   const gloss=entry.gloss ?? (typeof lexiconDefaultGloss === 'function' ? lexiconDefaultGloss(entry) : '');
+   const lemma=getLemmaForEntry({...entry,morph,gloss}) || entry.form;
+   const lemmaKey=lemma.toLowerCase();
+
+   if(!groups.has(lemmaKey)){
+     groups.set(lemmaKey,{lemma,forms:[]});
+   }
+
+   groups.get(lemmaKey).forms.push({
+     surface:entry.form,
+     morph,
+     gloss,
+     count:entry.count ?? '',
+     sections:entry.sections ? [...entry.sections].join(', ') : '',
+     examples:entry.examples ? entry.examples.map(ex=>`${ex.section}:W${ex.wordIndex}`).join(', ') : ''
+   });
+ });
+
+ let out='';
+
+ [...groups.values()].sort((a,b)=>a.lemma.localeCompare(b.lemma,undefined,{sensitivity:'base'})).forEach(group=>{
+   out+=`\\lx ${sfmEscape(group.lemma)}\n`;
+
+   group.forms.sort((a,b)=>a.surface.localeCompare(b.surface,undefined,{sensitivity:'base'})).forEach(form=>{
+     out+=`\\se ${sfmEscape(form.surface)}\n`;
+     if(form.morph) out+=`\\mr ${sfmEscape(form.morph)}\n`;
+     if(form.gloss) out+=`\\ge ${sfmEscape(form.gloss)}\n`;
+     out+=`\\nt Count: ${sfmEscape(form.count)}\n`;
+     if(form.sections) out+=`\\rf ${sfmEscape(form.sections)}\n`;
+     if(form.examples) out+=`\\xv ${sfmEscape(form.examples)}\n`;
+   });
+
+   out+='\n';
+ });
+
+ return out;
+}
+
+async function downloadLexiconSfm(){
+ const sfm=buildLexiconSfm();
+ if(!sfm){
+   alert('No lexicon entries to export.');
+   return;
+ }
+
+ if(window.showSaveFilePicker){
+   try{
+     const handle=await window.showSaveFilePicker({
+       suggestedName:'flextext_lexicon.sfm',
+       types:[{
+         description:'SFM Lexicon file',
+         accept:{'text/plain':['.sfm','.txt']}
+       }]
+     });
+     const writable=await handle.createWritable();
+     await writable.write(sfm);
+     await writable.close();
+     return;
+   }catch(e){
+     if(e && e.name==='AbortError') return;
+   }
+ }
+
+ const blob=new Blob([sfm],{type:'text/plain'});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');
+ a.href=url;
+ a.download='flextext_lexicon.sfm';
+ a.click();
+ URL.revokeObjectURL(url);
+}
+
+
+function exportFlextext(){if(!xmlDoc){alert('Load a .flextext file first.');return;}let xml=new XMLSerializer().serializeToString(xmlDoc);
+ if(!xml.trimStart().startsWith('<?xml')){
+   xml='<?xml version="1.0" encoding="UTF-8"?>\n'+xml;
+ }const blob=new Blob([xml],{type:'application/xml'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=exportedFlextextFilename();a.click();URL.revokeObjectURL(url);}
+</script>
+</body>
+</html>
